@@ -1,23 +1,43 @@
 package jdsdk
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/asmcos/requests"
 	"math/rand"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func GetLoginPage() {
-	url := "https://passport.jd.com/new/login.aspx"
-	header := requests.Header{
-		"user-agent": userAgent,
-	}
-	requests.Get(url, header)
+var sessionReq = requests.Requests()
+
+func init() {
+	sessionReq.Header.Set("User-Agent", userAgent)
+	//不允许重定向
+	sessionReq.Client.CheckRedirect =
+		func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
 }
 
-func GetQR() {
+func GetSessionReqCookies() {
+	sessionReq.Client.Jar = nil
+	json.Marshal(sessionReq.Client.Jar.Cookies())
+
+}
+
+func Proxy(proxy string) {
+	sessionReq.Proxy(proxy)
+}
+
+func GetLoginPage() {
+	url := "https://passport.jd.com/new/login.aspx"
+	sessionReq.Get(url)
+}
+
+func GetQR(qrPath string) (token string) {
 	url := "https://qr.m.jd.com/show"
 	header := requests.Header{
 		"user-agent": userAgent,
@@ -29,39 +49,48 @@ func GetQR() {
 		"t":     genTime(),
 	}
 
-	resp, err := requests.Get(url, header, param)
+	resp, err := sessionReq.Get(url, header, param)
 	if err != nil {
 		return
 	}
-	//resp.ResponseDebug()
-	println(resp.Text())
+	resp.SaveFile(qrPath)
+
+	resp.Cookies()
+	for _, c := range resp.Cookies() {
+		if c.Name == "wlfstk_smdl" {
+			return c.Value
+		}
+	}
+
+	return
 }
 
-func GetQrTicket() interface{} {
+func GetQrTicket(token string) string {
 	url := "https://qr.m.jd.com/check"
 	header := requests.Header{
 		"user-agent": userAgent,
 		"Referer":    "https://passport.jd.com/new/login.aspx",
 	}
 
-	//todo
-	wlfstk_smdl := "wlfstk_smdl get from cookie"
-
 	rand.Seed(time.Now().Unix())
 	param := requests.Params{
 		"appid":    "133",
 		"callback": genCallback(),
-		"token":    wlfstk_smdl,
-		"_":        genTime(),
+		//token=wlfstk_smdl := "wlfstk_smdl get from cookie"
+		"token": token,
+		"_":     genTime(),
 	}
 
-	resp, err := requests.Get(url, header, param)
+	resp, err := sessionReq.Get(url, header, param)
 	if err != nil {
 		return ""
 	}
-	var json map[string]interface{}
-	resp.Json(&json)
-	return json["ticket"]
+	type Ret struct {
+		Ticket string
+	}
+	var r Ret
+	json.Unmarshal([]byte(getJsonStr(resp.Text())), &r)
+	return r.Ticket
 }
 
 func ValidQRTicket(ticket string) bool {
@@ -75,16 +104,20 @@ func ValidQRTicket(ticket string) bool {
 		"t": ticket,
 	}
 
-	resp, err := requests.Get(url, header, param)
+	resp, err := sessionReq.Get(url, header, param)
 	if err != nil {
 		return false
 	}
-	var json map[string]interface{}
-	resp.Json(&json)
-	return json["returnCode"] == 0
+	type Ret struct {
+		ReturnCode int
+		Url        string
+	}
+	var r Ret
+	resp.Json(&r)
+	return r.ReturnCode == 0
 }
 
-func GetUserInfo() interface{} {
+func GetUserInfo() string {
 	url := "https://passport.jd.com/user/petName/getUserInfoForMiniJd.action"
 	header := requests.Header{
 		"user-agent": userAgent,
@@ -96,13 +129,17 @@ func GetUserInfo() interface{} {
 		"_":        genTime(),
 	}
 
-	resp, err := requests.Get(url, header, param)
+	resp, err := sessionReq.Get(url, header, param)
 	if err != nil {
-		return false
+		return "获取nick称失败"
 	}
-	var json map[string]interface{}
-	resp.Json(&json)
-	return json["nickName"]
+
+	type Ret struct {
+		NickName string
+	}
+	var r Ret
+	json.Unmarshal([]byte(getJsonStr(resp.Text())), &r)
+	return r.NickName
 }
 
 func GetKillInitInfo(skuId string, num int) interface{} {
@@ -118,7 +155,7 @@ func GetKillInitInfo(skuId string, num int) interface{} {
 		"isModifyAddress": "false",
 	}
 
-	resp, err := requests.Post(url, header, data)
+	resp, err := sessionReq.Post(url, header, data)
 	if err != nil {
 		return false
 	}
@@ -132,7 +169,7 @@ func GetKillUrl(skuId string) string {
 	header := requests.Header{
 		"user-agent": userAgent,
 		"Host":       "itemko.jd.com",
-		"Referer":    fmt.Sprint("https://item.jd.com/%v.html", skuId),
+		"Referer":    fmt.Sprintf("https://item.jd.com/%v.html", skuId),
 	}
 
 	param := requests.Params{
@@ -142,7 +179,7 @@ func GetKillUrl(skuId string) string {
 		"_":        genTime(),
 	}
 
-	resp, err := requests.Get(url, header, param)
+	resp, err := sessionReq.Get(url, header, param)
 	if err != nil {
 		return ""
 	}
@@ -150,21 +187,22 @@ func GetKillUrl(skuId string) string {
 	resp.Json(&json)
 
 	url = json["url"].(string)
+	if len(url) < 1 {
+		return url
+	}
 	url = strings.Replace(url, "divide", "marathon", -1)
 	killUrl := strings.Replace(url, "user_routing", "captcha.html", -1)
 	return "https:" + killUrl
 }
 
 func RequestKillUrl(skuId string, killUrl string) {
-
 	url := killUrl
 	header := requests.Header{
 		"user-agent": userAgent,
 		"Host":       "marathon.jd.com",
-		"Referer":    fmt.Sprint("https://item.jd.com/%v.html", skuId),
+		"Referer":    fmt.Sprintf("https://item.jd.com/%v.html", skuId),
 	}
 
-	//todo allow_redirects=False
 	requests.Get(url, header)
 }
 
@@ -173,8 +211,7 @@ func SubmitOrder(skuId string, num int, rid string) bool {
 	header := requests.Header{
 		"User-Agent": userAgent,
 		"Host":       "marathon.jd.com",
-		"Referer":
-		fmt.Sprint("https://marathon.jd.com/seckill/seckill.action?skuId=%v&num=%v&rid=%v", skuId, num, rid),
+		"Referer":    fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?skuId=%v&num=%v&rid=%v", skuId, num, rid),
 	}
 
 	param := requests.Params{
@@ -197,7 +234,7 @@ func SubmitOrder(skuId string, num int, rid string) bool {
 	//json["pcUrl"]
 }
 
-func ValidCookie(cookie string) {
+func ValidCookie(cookie string) bool {
 	url := "https://order.jd.com/center/list.action"
 	header := requests.Header{
 		"dnt":                       "1",
@@ -210,18 +247,18 @@ func ValidCookie(cookie string) {
 	}
 
 	param := requests.Params{
-		"rid": strconv.Itoa(time.Now().Second() * 1000),
+		"rid": genTime(),
 	}
 
 	resp, err := requests.Get(url, header, param)
 	if err != nil {
-		return
+		return false
 	}
-	//resp.ResponseDebug()
-	println(resp.Text())
+
+	return resp.R.StatusCode == 200
 }
 
-func GetServerTime() interface{} {
+func GetServerTime() int {
 	url := "https://a.jd.com//ajax/queryServerData.html"
 	header := requests.Header{
 		"User-Agent": userAgent,
@@ -229,19 +266,28 @@ func GetServerTime() interface{} {
 
 	resp, err := requests.Get(url, header)
 	if err != nil {
-		return false
+		return -1
 	}
-	var json map[string]interface{}
-	resp.Json(&json)
-	return json["serverTime"]
+	type Ret struct {
+		ServerTime int
+	}
+	var r Ret
+	resp.Json(&r)
+	return r.ServerTime
 }
 
 func genCallback() string {
-	return "jQuery{}" + strconv.Itoa(int(1000000+rand.Int31n(8999999)))
+	return "jQuery" + strconv.Itoa(int(1000000+rand.Int31n(8999999)))
 }
 
 func genTime() string {
 	return strconv.Itoa(time.Now().Second() * 1000)
+}
+
+func getJsonStr(text string) string {
+	fromIndex := strings.Index(text, "{")
+	endIndex := strings.LastIndex(text, "}")
+	return text[fromIndex : endIndex+1]
 }
 
 const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36"
