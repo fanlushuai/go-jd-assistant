@@ -2,14 +2,13 @@ package jdsdk
 
 import (
 	"fmt"
-	"go-jd-assistant/config"
 	"go-jd-assistant/util"
 	"testing"
 	"time"
 )
 
 func init() {
-	Proxy("http://localhost:8888")
+	//Proxy("http://localhost:8888")
 }
 
 func TestGetLoginPage(t *testing.T) {
@@ -64,6 +63,28 @@ func TestGetUserInfo(t *testing.T) {
 	fmt.Println(nickName)
 }
 
+func TestSaveCookies(t *testing.T) {
+	GetLoginPage()
+	qrfile := "./qrcode.png"
+	token := GetQR(qrfile)
+	util.Open(qrfile)
+	fmt.Println(token)
+	time.Sleep(8 * time.Second)
+	ticket := GetQrTicket(token)
+	fmt.Println("ticket->" + ticket)
+	ok := ValidQRTicket(ticket)
+	fmt.Print("ret-->")
+	fmt.Println(ok)
+
+	SaveCookies("./cookie.cookies")
+}
+
+func TestLoadCookies(t *testing.T) {
+	ReLoadCookies("./cookie.cookies")
+	nickName := GetUserInfo()
+	fmt.Println(nickName)
+}
+
 func TestValidCookie(t *testing.T) {
 	GetLoginPage()
 	qrfile := "./qrcode.png"
@@ -79,9 +100,7 @@ func TestValidCookie(t *testing.T) {
 	nickName := GetUserInfo()
 	fmt.Println(nickName)
 
-	jd := config.Config
-	ck := jd.Account.GetCookie()
-	validOk := ValidCookie(ck)
+	validOk := ValidCookie()
 	fmt.Println("validOk")
 	fmt.Println(validOk)
 }

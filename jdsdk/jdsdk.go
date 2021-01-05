@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/asmcos/requests"
+	"github.com/vdobler/ht/cookiejar"
+	"go-jd-assistant/util"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -12,6 +14,7 @@ import (
 )
 
 var sessionReq = requests.Requests()
+var jarP *cookiejar.Jar
 
 func init() {
 	sessionReq.Header.Set("User-Agent", userAgent)
@@ -20,16 +23,25 @@ func init() {
 		func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		}
+	//使用一个可以导出导入cookiejar的实现	github.com/vdobler/ht/cookiejar
+	jar, _ := cookiejar.New(nil)
+	jarP = jar
+	sessionReq.Client.Jar = jar
 }
 
-func GetSessionReqCookies() {
-	sessionReq.Client.Jar = nil
-	json.Marshal(sessionReq.Client.Jar.Cookies())
-
-}
-
+//record log by proxy
 func Proxy(proxy string) {
 	sessionReq.Proxy(proxy)
+}
+
+func SaveCookies(filePath string) {
+	util.SaveCookiesFromJar(jarP, filePath)
+}
+
+func ReLoadCookies(filePath string) {
+	jar := util.LoadCookies(filePath)
+	jarP = jar
+	sessionReq.Client.Jar = jar
 }
 
 func GetLoginPage() {
@@ -234,7 +246,7 @@ func SubmitOrder(skuId string, num int, rid string) bool {
 	//json["pcUrl"]
 }
 
-func ValidCookie(cookie string) bool {
+func ValidCookie() bool {
 	url := "https://order.jd.com/center/list.action"
 	header := requests.Header{
 		"dnt":                       "1",
@@ -243,14 +255,13 @@ func ValidCookie(cookie string) bool {
 		"sec-fetch-site":            "none",
 		"upgrade-insecure-requests": "1",
 		"user-agent":                userAgent,
-		"Cookie":                    cookie,
 	}
 
 	param := requests.Params{
 		"rid": genTime(),
 	}
 
-	resp, err := requests.Get(url, header, param)
+	resp, err := sessionReq.Get(url, header, param)
 	if err != nil {
 		return false
 	}

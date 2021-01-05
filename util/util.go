@@ -1,11 +1,11 @@
 package util
 
 import (
-	"bytes"
-	"encoding/gob"
-	"fmt"
+	"encoding/json"
 	"github.com/jordan-wright/email"
-	"net/http"
+	"github.com/vdobler/ht/cookiejar"
+	"io/ioutil"
+	"log"
 	"net/textproto"
 	"os/exec"
 	"runtime"
@@ -33,25 +33,49 @@ func SendEmailOutlook(filePath string, to string) {
 	e.Send("smtp.office365.com:587", auth)
 }
 
-func ToGobStr(obj []*http.Cookie) string {
-
-	buf := bytes.Buffer{}
-
-	encoder := gob.NewEncoder(&buf)
-
-	err := encoder.Encode(obj)
-	if err != nil {
-		fmt.Println("编码失败,错误原因: ", err)
-		return "编码失败"
+func SaveCookiesFromJar(jar *cookiejar.Jar, filename string) error {
+	if jar == nil {
+		return nil
 	}
 
-	gobStr := string(buf.Bytes())
-	return gobStr
+	cookies := make(map[string]cookiejar.Entry)
+	for _, tld := range jar.ETLDsPlus1(nil) {
+		for _, cookie := range jar.Entries(tld, nil) {
+			id := cookie.ID()
+			cookies[id] = cookie
+		}
+	}
+	return saveCookies(cookies, filename)
 }
 
-func FromGobStr(gobStr string) []*http.Cookie {
-	decoder := gob.NewDecoder(bytes.NewReader([]byte(gobStr)))
-	var v []*http.Cookie
-	decoder.Decode(&v)
-	return v
+func saveCookies(cookies map[string]cookiejar.Entry, filename string) error {
+	b, err := json.MarshalIndent(cookies, "    ", "")
+	if err != nil {
+		return nil
+	}
+	return ioutil.WriteFile(filename, b, 0666)
+}
+
+func LoadCookies(filename string) *cookiejar.Jar {
+	if filename == "" {
+		return nil
+	}
+	buf, err := ioutil.ReadFile(filename)
+	if err != nil {
+		log.Panicf("Cannot read cookie file: %s", err)
+	}
+
+	cookies := make(map[string]cookiejar.Entry)
+	err = json.Unmarshal(buf, &cookies)
+	if err != nil {
+		log.Panicf("Cannot decode cookie file: %s", err)
+	}
+	cs := make([]cookiejar.Entry, 0, len(cookies))
+	for _, c := range cookies {
+		cs = append(cs, c)
+	}
+
+	jar, _ := cookiejar.New(nil)
+	jar.LoadEntries(cs)
+	return jar
 }

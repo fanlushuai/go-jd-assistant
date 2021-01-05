@@ -10,14 +10,14 @@ type Jd struct {
 }
 
 type Account struct {
-	Name        string
-	Pwd         string
-	Cookie      string
-	Eid         string
-	Fp          string
-	TrackId     string
-	RiskControl string
-	Sku         Sku
+	Name           string
+	Pwd            string
+	CookieFilePath string
+	Eid            string
+	Fp             string
+	TrackId        string
+	RiskControl    string
+	Sku            Sku
 }
 
 type Sku struct {
@@ -42,19 +42,4 @@ func init() {
 
 	//todo 大坑：这个操作。结构体内的属性，必须大写开头。不然搞不进去！！！！
 	viper.Unmarshal(&Config)
-}
-
-func writeCookie(cookie string) {
-	viper.Set("account.cookie", cookie)
-	viper.WriteConfig()
-}
-
-func (ac *Account) GetCookie() string {
-	return ac.Cookie
-}
-
-func (ac *Account) SetCookie(cookie string) {
-	ac.Cookie = cookie
-	//写入配置文件
-	writeCookie(cookie)
 }
