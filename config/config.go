@@ -23,7 +23,7 @@ type Account struct {
 type Sku struct {
 	Allow       bool
 	Id          string
-	Count       int
+	Count       string
 	ReserveTime string
 	BuyTime     string
 }

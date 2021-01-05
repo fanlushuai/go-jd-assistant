@@ -105,6 +105,20 @@ func TestValidCookie(t *testing.T) {
 	fmt.Println(validOk)
 }
 
+func TestGetKillInitInfo(t *testing.T) {
+	ReLoadCookies("../my.cookies")
+	GetKillInitInfo("100012043978", "1")
+}
+
+func TestSubmitOrder(t *testing.T) {
+	//ReLoadCookies("../my.cookies")
+	//initdata:=GetKillInitInfo("100012043978",1)
+	////
+	////submitOrderPostDatas:=BuildSubmitOrderPostData(,,&initdata)
+	////datasMapStringString:structs.Map(submitOrderPostDatas)
+	////SubmitOrder(,,,datasMapStringString)
+}
+
 func TestGetServerTime(t *testing.T) {
 	fmt.Println(GetServerTime())
 }

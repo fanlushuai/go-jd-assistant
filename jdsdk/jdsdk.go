@@ -8,6 +8,7 @@ import (
 	"go-jd-assistant/util"
 	"math/rand"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -154,7 +155,7 @@ func GetUserInfo() string {
 	return r.NickName
 }
 
-func GetKillInitInfo(skuId string, num int) interface{} {
+func GetKillInitInfo(skuId string, num string) InitData {
 	url := "https://marathon.jd.com/seckillnew/orderService/pc/init.action"
 	header := requests.Header{
 		"user-agent": userAgent,
@@ -163,17 +164,18 @@ func GetKillInitInfo(skuId string, num int) interface{} {
 
 	data := requests.Datas{
 		"sku":             skuId,
-		"num":             strconv.Itoa(num),
+		"num":             num,
 		"isModifyAddress": "false",
 	}
 
 	resp, err := sessionReq.Post(url, header, data)
 	if err != nil {
-		return false
+		return InitData{}
 	}
-	var json map[string]interface{}
-	resp.Json(&json)
-	return json
+
+	var initdata InitData
+	resp.Json(&initdata)
+	return initdata
 }
 
 func GetKillUrl(skuId string) string {
@@ -215,11 +217,13 @@ func RequestKillUrl(skuId string, killUrl string) {
 		"Referer":    fmt.Sprintf("https://item.jd.com/%v.html", skuId),
 	}
 
-	requests.Get(url, header)
+	sessionReq.Get(url, header)
 }
 
-func SubmitOrder(skuId string, num int, rid string) bool {
+func SubmitOrder(skuId string, num string, datas *map[string]string) bool {
 	url := "https://marathon.jd.com/seckillnew/orderService/pc/submitOrder.action"
+	//todo ？ 这个rid是Referer的链接。也就是说，不知道这个重要不，是否需要一个真正的值。还是按照格式来一个就行
+	rid := genTime()
 	header := requests.Header{
 		"User-Agent": userAgent,
 		"Host":       "marathon.jd.com",
@@ -230,20 +234,29 @@ func SubmitOrder(skuId string, num int, rid string) bool {
 		"skuId": skuId,
 	}
 
-	data := requests.Datas{}
-	//todo 获取起初，初始化的订单data
-	resp, err := requests.Post(url, header, param, data)
+	resp, err := sessionReq.Post(url, header, param, &datas)
 	if err != nil {
 		return false
 	}
-	var json map[string]interface{}
-	resp.Json(&json)
-	//todo 怎么判断成功
-	//json["success"] == 0
-	return true
-	//json["orderId"]
-	//json["totalMoney"]
-	//json["pcUrl"]
+
+	type Ret struct {
+		success      bool //todo 类型等待验证
+		errorMessage string
+		orderId      string
+		resultCode   string
+	}
+
+	var r Ret
+
+	resp.Json(&r)
+
+	fmt.Println(r)
+
+	if r.success {
+		return true
+	}
+
+	return false
 }
 
 func ValidCookie() bool {
@@ -280,7 +293,7 @@ func GetServerTime() int {
 		return -1
 	}
 	type Ret struct {
-		ServerTime int
+		ServerTime int //1609878734768
 	}
 	var r Ret
 	resp.Json(&r)
@@ -305,4 +318,126 @@ const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 
 
 func genUserAgent() string {
 	return userAgent
+}
+
+type InitData struct {
+	addressList []address
+	token       string
+	invoiceInfo invoiceInfo
+}
+
+type invoiceInfo struct {
+	invoiceTitle       string
+	invoiceContentType string
+	invoicePhone       string
+	invoicePhoneKey    string
+}
+
+type address struct {
+	id            string
+	name          string
+	provinceId    string
+	cityId        string
+	countyId      string
+	townId        string
+	addressDetail string
+	email         string
+}
+
+func BuildSubmitOrderPostData(pw string, fp string, eid string, skuid string, num string, initData *InitData) *map[string]string {
+
+	var data SubmitOrderPostData
+
+	{
+		data.num = num
+		data.skuId = skuid
+		data.fp = fp
+		data.eid = eid
+		data.password = pw
+	}
+
+	{
+		defaultAddress := initData.addressList[0]
+		invInfo := initData.invoiceInfo
+
+		data.token = initData.token
+
+		data.addressDetail = defaultAddress.addressDetail
+		data.addressId = defaultAddress.id
+		data.countyId = defaultAddress.countyId
+		data.cityId = defaultAddress.cityId
+		data.provinceId = defaultAddress.provinceId
+		data.townId = defaultAddress.townId
+		data.name = defaultAddress.name
+		data.email = defaultAddress.email
+
+		if invInfo != (invoiceInfo{}) {
+			data.invoice = "true"
+			data.invoiceTitle = invInfo.invoiceTitle
+			data.invoiceContent = invInfo.invoiceContentType
+			data.invoicePhoneKey = invInfo.invoicePhoneKey
+			data.invoicePhone = invInfo.invoicePhone
+		}
+	}
+
+	data.pru = ""
+	data.phone = ""
+	data.overseas = "0"
+	data.areaCode = ""
+	data.paymentType = "4"
+	data.codTimeType = "3"
+	data.invoiceEmail = ""
+	data.invoiceTaxpayerNO = ""
+	data.invoiceCompanyName = ""
+	data.postCode = ""
+	data.isModifyAddress = "false"
+	data.yuShou = "" //todo
+
+	return toMapstringstring(data)
+}
+
+func toMapstringstring(data SubmitOrderPostData) *map[string]string {
+	m := make(map[string]string)
+	t := reflect.TypeOf(data)
+	v := reflect.ValueOf(data)
+	for i := 0; i < v.NumField(); i++ {
+		m[t.Field(i).Name] = v.Field(i).Interface().(string)
+	}
+	return &m
+}
+
+type SubmitOrderPostData struct {
+	skuId              string
+	num                string
+	addressId          string
+	yuShou             string
+	isModifyAddress    string
+	name               string
+	provinceId         string
+	cityId             string
+	countyId           string
+	townId             string
+	addressDetail      string
+	mobile             string
+	mobileKey          string
+	email              string
+	postCode           string
+	invoiceTitle       string
+	invoiceCompanyName string
+	invoiceContent     string
+	invoiceTaxpayerNO  string
+	invoiceEmail       string
+	invoicePhone       string
+	invoicePhoneKey    string
+	invoice            string
+	password           string
+	codTimeType        string
+	paymentType        string
+	areaCode           string
+	overseas           string
+	phone              string
+	eid                string
+	fp                 string
+	token              string
+	pru                string
 }

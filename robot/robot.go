@@ -12,15 +12,13 @@ func Run() {
 	//设计为，定时登录。并且开机验证。登录cookie并且设置cookie登录时间，
 	//计算抢购时间延后一小时，保证30分钟前有一次验证。一次验证周期为30分钟。逆向推算首次验证的周期
 	//保证抢购时间延后一个小时，一定距离现在小于24小时。
-	jd, err := login()
-	if err != nil {
-		//send 登录失败，重新登录。
-	}
+	login()
+
 	//todo 启动定时器
-	reserve(jd)
-	syncTime()
-	//todo 启动定时器
-	kill(jd)
+	reserve()
+	//syncTime()
+	////todo 启动定时器
+	kill()
 }
 
 var qrTimeout = errors.New("验证码扫描超时")
@@ -29,9 +27,11 @@ func login() (jdConfig *config.Jd, err error) {
 	// load config
 	jd := config.Config
 
-	if len(jd.Account.Cookie) > 0 && jdsdk.ValidCookie(jd.Account.Cookie) {
-		//valid exist cookie suc as logined
-		return &jd, nil
+	if util.Exists(jd.Account.CookieFilePath) {
+		jdsdk.ReLoadCookies(jd.Account.CookieFilePath)
+		if jdsdk.ValidCookie() {
+			return &jd, nil
+		}
 	}
 
 	//reLogin
@@ -40,7 +40,8 @@ func login() (jdConfig *config.Jd, err error) {
 	QRFilePath := "./qrcode.png"
 	token := jdsdk.GetQR(QRFilePath)
 
-	//todo && send email
+	//you can do this for server deploy
+	//-> util.SendEmailOutlook()
 	util.Open(QRFilePath)
 
 	checkLeftTimes := 5
@@ -58,33 +59,41 @@ func login() (jdConfig *config.Jd, err error) {
 	}
 
 	if jdsdk.ValidQRTicket(ticket) {
-		jdsdk.GetUserInfo()
-		//todo 获取cookie
-		cookie := "parse from logined request"
-		jd.Account.SetCookie(cookie)
+		jdsdk.SaveCookies(jd.Account.CookieFilePath)
 		return &jd, nil
 	}
 
 	return nil, err
 }
 
-func reserve(config config.Jd) {
+func reserve() {
 
 }
 
-func kill(config config.Jd) {
-	skuId := config.Account.Sku.Id
-	num := config.Account.Sku.Count
-	jdsdk.GetKillInitInfo(skuId, num)
+func kill() {
+	ac := config.Config.Account
 
-	//todo 定时，并发
-	jdsdk.GetKillUrl(skuId)
-	killUrl := "sdfsdf"
-	jdsdk.RequestKillUrl(skuId, killUrl)
-	rid := "fdsfsdfsdfd"
-	jdsdk.SubmitOrder(skuId, num, rid)
+	initInfo := jdsdk.GetKillInitInfo(ac.Sku.Id, ac.Sku.Count)
+	submitOrderPostData := jdsdk.BuildSubmitOrderPostData(
+		ac.Pwd,
+		ac.Fp,
+		ac.Eid,
+		ac.Sku.Id,
+		ac.Sku.Count,
+		&initInfo,
+	)
+
+	killUrl := jdsdk.GetKillUrl(ac.Sku.Id)
+	jdsdk.RequestKillUrl(ac.Sku.Id, killUrl)
+
+	jdsdk.SubmitOrder(ac.Sku.Id, ac.Sku.Count, submitOrderPostData)
 }
 
-func syncTime() {
-	jdsdk.GetServerTime()
+func diffLocalServerTime() int {
+	t1 := time.Now()
+	serverTimeMS := jdsdk.GetServerTime()
+	elapsed := time.Since(t1)
+
+	diff := time.Now().Nanosecond()/1000 - (int(elapsed.Milliseconds())/2 + serverTimeMS)
+	return diff
 }

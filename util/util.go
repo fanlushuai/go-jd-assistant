@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/textproto"
+	"os"
 	"os/exec"
 	"runtime"
 )
@@ -78,4 +79,15 @@ func LoadCookies(filename string) *cookiejar.Jar {
 	jar, _ := cookiejar.New(nil)
 	jar.LoadEntries(cs)
 	return jar
+}
+
+func Exists(path string) bool {
+	_, err := os.Stat(path) //os.Stat获取文件信息
+	if err != nil {
+		if os.IsExist(err) {
+			return true
+		}
+		return false
+	}
+	return true
 }

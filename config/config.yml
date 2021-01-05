@@ -1,6 +1,7 @@
 account:
   name:
   pwd:
+  cookieFilePath: './my.cookies'
   eid:
   fp:
   trackId:
