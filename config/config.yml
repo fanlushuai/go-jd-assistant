@@ -1,5 +1,4 @@
 account:
-  name:
   pwd:
   cookieFilePath: './my.cookies'
   eid:
@@ -7,9 +6,7 @@ account:
   trackId:
   riskControl:
   sku:
-    allow: true
     id: '2132134324234'
     count: 1
-    reserveTime: '2020-12-31'
     #时间格式time.RFC3339 "2009-01-01T01:02:01.100+08:00"
     buyTime: '2020-12-31'

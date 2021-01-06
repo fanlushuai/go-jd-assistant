@@ -10,7 +10,6 @@ type Jd struct {
 }
 
 type Account struct {
-	Name           string
 	Pwd            string
 	CookieFilePath string
 	Eid            string
@@ -21,11 +20,9 @@ type Account struct {
 }
 
 type Sku struct {
-	Allow       bool
-	Id          string
-	Count       string
-	ReserveTime string
-	BuyTime     string
+	Id      string
+	Count   string
+	BuyTime string
 }
 
 var Config Jd
