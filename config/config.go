@@ -31,6 +31,7 @@ type Sku struct {
 var Config Jd
 
 func init() {
+	//关于配置文件的路径问题。难搞。哈哈哈
 	viper.AddConfigPath(".")
 	viper.SetConfigName("config")
 	viper.SetConfigType("yml")
