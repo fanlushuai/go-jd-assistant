@@ -163,6 +163,8 @@ func GetKillInitInfo(skuId string, num string) InitData {
 		"isModifyAddress": "false",
 	}
 
+	//这个头按说不应该添加，奈何开源库的bug。没有对这个进行处理 https://github.com/asmcos/requests/issues/23
+	header["Content-Type"] = "application/x-www-form-urlencoded"
 	resp, err := sessionReq.Post(url, header, data)
 	if err != nil {
 		fmt.Println("fuck initinfo 获取失败了。好好思考一下")
@@ -230,6 +232,7 @@ func SubmitOrder(skuId string, num string, datas *map[string]string) bool {
 		"skuId": skuId,
 	}
 
+	header["Content-Type"] = "application/x-www-form-urlencoded"
 	resp, err := sessionReq.Post(url, header, param, &datas)
 	if err != nil {
 		return false

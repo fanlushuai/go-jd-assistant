@@ -133,3 +133,10 @@ func TestPareJson(t *testing.T) {
 	m := BuildSubmitOrderPostData("pw", "fp", "eid", "skuid", "num", &initdata)
 	fmt.Println(m)
 }
+
+func TestBuildSubmitOrderPostData(t *testing.T) {
+	ReLoadCookies("../my.cookies")
+	initdata := GetKillInitInfo("100012043978", "1")
+	m := BuildSubmitOrderPostData("pw", "fp", "eid", "skuid", "num", &initdata)
+	fmt.Println(m)
+}
