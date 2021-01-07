@@ -20,19 +20,9 @@ func init() {
 func Run() {
 	login()
 
-	//基于时间校准，一个新的触发时间和抢购时间
-	triggerTimeMs := getTriggerTime()
+	diffTimeMs := diffLocalServerTime()
 
-	//不用sleep准点触发，对其精度表示怀疑。提前5s
-	waitToTriggerTimeMs := triggerTimeMs - int(time.Now().UnixNano()/1000000)
-	time.Sleep(time.Duration(waitToTriggerTimeMs-5*1000) * time.Millisecond)
-
-	//先把初始化数据搞下，抢的时候，不浪费时间
-	submitOrderPostData := getSubmitOrderPostData(ac.Sku)
-	//消耗一下cpu，触发,这种方式也许会准点
-	nervousBlockWait(triggerTimeMs)
-
-	kill(submitOrderPostData)
+	doSku(ac.Sku, diffTimeMs)
 }
 
 func login() (err error) {
@@ -76,9 +66,25 @@ func login() (err error) {
 	return errors.New("预期流程未能正确登录，请检查代码")
 }
 
-func getTriggerTime() int {
-	diffTimeMs := diffLocalServerTime()
-	buytime, _ := time.Parse(time.RFC3339, c.Account.Sku.BuyTime)
+//this can do for many sku if you need,code like: for sku skus {doSku(sku)}
+func doSku(sku config.Sku, diffTimeMs int) {
+	//基于时间校准，一个新的触发时间和抢购时间
+	triggerTimeMs := getTriggerTime(sku, diffTimeMs)
+
+	//不用sleep准点触发，对其精度表示怀疑。提前5s
+	waitToTriggerTimeMs := triggerTimeMs - int(time.Now().UnixNano()/1000000)
+	time.Sleep(time.Duration(waitToTriggerTimeMs-5*1000) * time.Millisecond)
+
+	//先把初始化数据搞下，抢的时候，不浪费时间
+	submitOrderPostData := getSubmitOrderPostData(sku)
+	//消耗一下cpu，触发,这种方式也许会准点
+	nervousBlockWait(triggerTimeMs)
+
+	kill(submitOrderPostData)
+}
+
+func getTriggerTime(sku config.Sku, diffTimeMs int) int {
+	buytime, _ := time.Parse(time.RFC3339, sku.BuyTime)
 	//时间格式：06-01-02 03:04:05.000  奇葩的go语言，奇葩的时间格式
 	triggerTimeMs := int(buytime.UnixNano()/1000000) - diffTimeMs
 	return triggerTimeMs
