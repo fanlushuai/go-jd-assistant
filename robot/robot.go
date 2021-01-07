@@ -9,32 +9,38 @@ import (
 	"time"
 )
 
+var c config.Jd
+var ac config.Account
+
+func init() {
+	c = config.Config
+	ac = config.Config.Account
+}
+
 func Run() {
 	login()
 
 	//基于时间校准，一个新的触发时间和抢购时间
-	c := config.Config
-	diffTimeMs := diffLocalServerTime()
-	buytime, _ := time.Parse(time.RFC3339, c.Account.Sku.BuyTime)
-	//时间格式：06-01-02 03:04:05.000  奇葩的go语言，奇葩的时间格式
-	triggerTimeMs := int(buytime.UnixNano()/1000000) - diffTimeMs
+	triggerTimeMs := getTriggerTime()
 
-	wartToTriggerTimeMs := triggerTimeMs - int(time.Now().UnixNano()/1000000)
-	time.Sleep(time.Duration(wartToTriggerTimeMs) * time.Millisecond)
+	//不用sleep准点触发，对其精度表示怀疑。提前5s
+	waitToTriggerTimeMs := triggerTimeMs - int(time.Now().UnixNano()/1000000)
+	time.Sleep(time.Duration(waitToTriggerTimeMs-5*1000) * time.Millisecond)
 
-	//开启定时器，准备逼近抢购时间，调度一次
-	kill(triggerTimeMs)
+	//先把初始化数据搞下，抢的时候，不浪费时间
+	submitOrderPostData := getSubmitOrderPostData(ac.Sku)
+	//消耗一下cpu，触发,这种方式也许会准点
+	nervousBlockWait(triggerTimeMs)
+
+	kill(submitOrderPostData)
 }
 
-var qrTimeout = errors.New("验证码扫描超时")
-
-func login() (jdConfig *config.Jd, err error) {
-	c := config.Config
-
+func login() (err error) {
 	if util.Exists(c.Account.CookieFilePath) {
 		jdsdk.ReLoadCookies(c.Account.CookieFilePath)
 		if jdsdk.ValidCookie() {
-			return &c, nil
+			fmt.Println("本地cookie登录成功")
+			return nil
 		}
 	}
 
@@ -58,16 +64,24 @@ func login() (jdConfig *config.Jd, err error) {
 		}
 
 		if checkLeftTimes--; checkLeftTimes == 0 {
-			return nil, qrTimeout
+			return errors.New("验证码扫描超时")
 		}
 	}
 
 	if jdsdk.ValidQRTicket(ticket) {
 		jdsdk.SaveCookies(c.Account.CookieFilePath)
-		return &c, nil
+		return nil
 	}
 
-	return nil, err
+	return errors.New("预期流程未能正确登录，请检查代码")
+}
+
+func getTriggerTime() int {
+	diffTimeMs := diffLocalServerTime()
+	buytime, _ := time.Parse(time.RFC3339, c.Account.Sku.BuyTime)
+	//时间格式：06-01-02 03:04:05.000  奇葩的go语言，奇葩的时间格式
+	triggerTimeMs := int(buytime.UnixNano()/1000000) - diffTimeMs
+	return triggerTimeMs
 }
 
 func diffLocalServerTime() int {
@@ -77,32 +91,6 @@ func diffLocalServerTime() int {
 
 	diff := int(time.Now().UnixNano()/1000000) - (int(elapsed.Milliseconds())/2 + serverTimeMS)
 	return diff
-}
-
-func kill(triggerTimeMs int) {
-	ac := config.Config.Account
-
-	//应该什么时候出发呢？
-	initInfo := jdsdk.GetKillInitInfo(ac.Sku.Id, ac.Sku.Count)
-	submitOrderPostData := jdsdk.BuildSubmitOrderPostData(
-		ac.Pwd,
-		ac.Fp,
-		ac.Eid,
-		ac.Sku.Id,
-		ac.Sku.Count,
-		&initInfo,
-	)
-
-	//外层方法要提起一点调度。这个方法用来弥补，调度框架的精度问题
-	nervousBlockWait(triggerTimeMs)
-
-	//确保第一时间获取到killurl
-	killUrl := getKillUrl(ac.Sku.Id)
-
-	jdsdk.RequestKillUrl(ac.Sku.Id, killUrl)
-
-	//多次并发抢购
-	submitOrder(ac.Sku.Id, ac.Sku.Count, submitOrderPostData)
 }
 
 // 这种循环方式，可能比定时器，会准一点。
@@ -117,50 +105,72 @@ func nervousBlockWait(timeMs int) {
 	fmt.Println("开始执行")
 }
 
-func getKillUrl(skuid string) string {
-	ch := make(chan string, 200)
+func kill(submitOrderPostData *map[string]string) {
+	//确保第一时间获取到killurl
+	killUrl := getKillUrl(ac.Sku.Id)
 
-	goOn := GoOn{
-		value: true,
-	}
-	fastGetKillUrl(skuid, ch, &goOn)
+	jdsdk.RequestKillUrl(ac.Sku.Id, killUrl)
+
+	//多次并发抢购
+	submitOrder(ac.Sku.Id, ac.Sku.Count, submitOrderPostData)
+}
+
+func getSubmitOrderPostData(sku config.Sku) *map[string]string {
+	initInfo := jdsdk.GetKillInitInfo(sku.Id, sku.Count)
+	submitOrderPostData := jdsdk.BuildSubmitOrderPostData(
+		ac.Pwd,
+		ac.Fp,
+		ac.Eid,
+		ac.Sku.Id,
+		ac.Sku.Count,
+		&initInfo,
+	)
+	return submitOrderPostData
+}
+
+func getKillUrl(skuId string) string {
+	ch := make(chan string, 1314)
+
+	go func(ch chan string) {
+
+		type Goon struct {
+			value bool
+		}
+
+		giveUpLoopLeftTimes := 100
+		goon := Goon{value: true}
+		for {
+
+			if !goon.value || giveUpLoopLeftTimes == 0 {
+				break
+			}
+
+			go func(g *Goon, ch chan string) {
+				url := jdsdk.GetKillUrl(skuId)
+				if len(url) > 0 {
+					ch <- url
+					g.value = false
+				}
+			}(&goon, ch)
+
+			time.Sleep(20 * time.Millisecond)
+			giveUpLoopLeftTimes--
+		}
+
+	}(ch)
+
 	killUrl := <-ch
 
 	return killUrl
 }
 
-type GoOn struct {
-	value bool
-}
-
-func fastGetKillUrl(skuId string, c chan string, goon *GoOn) {
-	for {
-		if !goon.value {
-			break
-		}
-
-		go func() {
-			url := jdsdk.GetKillUrl(skuId)
-			if len(url) > 0 {
-				c <- url
-			}
-		}()
-
-		time.Sleep(20 * time.Millisecond)
-	}
-}
-
-func submitOrder(skuid string, num string, data *map[string]string) {
-	fastSubmitOrder(skuid, num, data)
-}
-
-func fastSubmitOrder(skuid string, num string, data *map[string]string) {
+func submitOrder(skuId string, num string, data *map[string]string) {
 	tryTimes := 8
 
 	for tryTimes > 0 {
 		tryTimes--
-		go jdsdk.SubmitOrder(skuid, num, data)
-		go jdsdk.SubmitOrder(skuid, num, data)
+		go jdsdk.SubmitOrder(skuId, num, data)
+		go jdsdk.SubmitOrder(skuId, num, data)
 		time.Sleep(20 * time.Millisecond)
 	}
 }
