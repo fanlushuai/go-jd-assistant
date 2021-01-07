@@ -53,8 +53,7 @@ func GetLoginPage() {
 func GetQR(qrPath string) (token string) {
 	url := "https://qr.m.jd.com/show"
 	header := requests.Header{
-		"user-agent": userAgent,
-		"Referer":    "https://passport.jd.com/new/login.aspx",
+		"Referer": "https://passport.jd.com/new/login.aspx",
 	}
 	param := requests.Params{
 		"appid": "133",
@@ -81,8 +80,7 @@ func GetQR(qrPath string) (token string) {
 func GetQrTicket(token string) string {
 	url := "https://qr.m.jd.com/check"
 	header := requests.Header{
-		"user-agent": userAgent,
-		"Referer":    "https://passport.jd.com/new/login.aspx",
+		"Referer": "https://passport.jd.com/new/login.aspx",
 	}
 
 	rand.Seed(time.Now().Unix())
@@ -109,8 +107,7 @@ func GetQrTicket(token string) string {
 func ValidQRTicket(ticket string) bool {
 	url := "https://passport.jd.com/uc/qrCodeTicketValidation"
 	header := requests.Header{
-		"user-agent": userAgent,
-		"Referer":    "https://passport.jd.com/uc/login?ltype=logout",
+		"Referer": "https://passport.jd.com/uc/login?ltype=logout",
 	}
 
 	param := requests.Params{
@@ -133,8 +130,7 @@ func ValidQRTicket(ticket string) bool {
 func GetUserInfo() string {
 	url := "https://passport.jd.com/user/petName/getUserInfoForMiniJd.action"
 	header := requests.Header{
-		"user-agent": userAgent,
-		"Referer":    "https://order.jd.com/center/list.action",
+		"Referer": "https://order.jd.com/center/list.action",
 	}
 
 	param := requests.Params{
@@ -158,8 +154,7 @@ func GetUserInfo() string {
 func GetKillInitInfo(skuId string, num string) InitData {
 	url := "https://marathon.jd.com/seckillnew/orderService/pc/init.action"
 	header := requests.Header{
-		"user-agent": userAgent,
-		"Host":       "marathon.jd.com",
+		"Host": "marathon.jd.com",
 	}
 
 	data := requests.Datas{
@@ -170,6 +165,7 @@ func GetKillInitInfo(skuId string, num string) InitData {
 
 	resp, err := sessionReq.Post(url, header, data)
 	if err != nil {
+		fmt.Println("fuck initinfo 获取失败了。好好思考一下")
 		return InitData{}
 	}
 
@@ -181,9 +177,8 @@ func GetKillInitInfo(skuId string, num string) InitData {
 func GetKillUrl(skuId string) string {
 	url := "https://itemko.jd.com/itemShowBtn"
 	header := requests.Header{
-		"user-agent": userAgent,
-		"Host":       "itemko.jd.com",
-		"Referer":    fmt.Sprintf("https://item.jd.com/%v.html", skuId),
+		"Host":    "itemko.jd.com",
+		"Referer": fmt.Sprintf("https://item.jd.com/%v.html", skuId),
 	}
 
 	param := requests.Params{
@@ -197,24 +192,26 @@ func GetKillUrl(skuId string) string {
 	if err != nil {
 		return ""
 	}
-	var json map[string]interface{}
-	resp.Json(&json)
-
-	url = json["url"].(string)
-	if len(url) < 1 {
-		return url
+	type Ret struct {
+		Url string
 	}
-	url = strings.Replace(url, "divide", "marathon", -1)
-	killUrl := strings.Replace(url, "user_routing", "captcha.html", -1)
-	return "https:" + killUrl
+	var r Ret
+	resp.Json(&r)
+
+	if len(r.Url) > 3 {
+		url = strings.Replace(url, "divide", "marathon", -1)
+		killUrl := strings.Replace(url, "user_routing", "captcha.html", -1)
+		return "https:" + killUrl
+	}
+
+	return ""
 }
 
 func RequestKillUrl(skuId string, killUrl string) {
 	url := killUrl
 	header := requests.Header{
-		"user-agent": userAgent,
-		"Host":       "marathon.jd.com",
-		"Referer":    fmt.Sprintf("https://item.jd.com/%v.html", skuId),
+		"Host":    "marathon.jd.com",
+		"Referer": fmt.Sprintf("https://item.jd.com/%v.html", skuId),
 	}
 
 	sessionReq.Get(url, header)
@@ -225,9 +222,8 @@ func SubmitOrder(skuId string, num string, datas *map[string]string) bool {
 	//todo ？ 这个rid是Referer的链接。也就是说，不知道这个重要不，是否需要一个真正的值。还是按照格式来一个就行
 	rid := genTime()
 	header := requests.Header{
-		"User-Agent": userAgent,
-		"Host":       "marathon.jd.com",
-		"Referer":    fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?skuId=%v&num=%v&rid=%v", skuId, num, rid),
+		"Host":    "marathon.jd.com",
+		"Referer": fmt.Sprintf("https://marathon.jd.com/seckill/seckill.action?skuId=%v&num=%v&rid=%v", skuId, num, rid),
 	}
 
 	param := requests.Params{
@@ -284,11 +280,8 @@ func ValidCookie() bool {
 
 func GetServerTime() int {
 	url := "https://a.jd.com//ajax/queryServerData.html"
-	header := requests.Header{
-		"User-Agent": userAgent,
-	}
 
-	resp, err := requests.Get(url, header)
+	resp, err := requests.Get(url)
 	if err != nil {
 		return -1
 	}
@@ -321,27 +314,37 @@ func genUserAgent() string {
 }
 
 type InitData struct {
-	addressList []address
-	token       string
-	invoiceInfo invoiceInfo
-}
-
-type invoiceInfo struct {
-	invoiceTitle       string
-	invoiceContentType string
-	invoicePhone       string
-	invoicePhoneKey    string
+	AddressList  []address
+	InvoiceInfo  invoiceInfo
+	SeckillSkuVO seckillSkuVO
+	Test         seckillSkuVO
+	Token        string
 }
 
 type address struct {
-	id            string
-	name          string
-	provinceId    string
-	cityId        string
-	countyId      string
-	townId        string
-	addressDetail string
-	email         string
+	Id            int
+	Name          string
+	ProvinceId    int
+	CityId        int
+	CountyId      int
+	TownId        int
+	AddressDetail string
+	Email         string
+}
+
+type invoiceInfo struct {
+	InvoiceTitle       int
+	InvoiceContentType int
+	InvoicePhone       string
+	InvoicePhoneKey    string
+}
+
+type seckillSkuVO struct {
+	ExtMap extMap
+}
+
+type extMap struct {
+	YuShou string
 }
 
 func BuildSubmitOrderPostData(pw string, fp string, eid string, skuid string, num string, initData *InitData) *map[string]string {
@@ -357,27 +360,35 @@ func BuildSubmitOrderPostData(pw string, fp string, eid string, skuid string, nu
 	}
 
 	{
-		defaultAddress := initData.addressList[0]
-		invInfo := initData.invoiceInfo
+		defaultAddress := initData.AddressList[0]
+		invInfo := initData.InvoiceInfo
 
-		data.token = initData.token
+		data.token = initData.Token
 
-		data.addressDetail = defaultAddress.addressDetail
-		data.addressId = defaultAddress.id
-		data.countyId = defaultAddress.countyId
-		data.cityId = defaultAddress.cityId
-		data.provinceId = defaultAddress.provinceId
-		data.townId = defaultAddress.townId
-		data.name = defaultAddress.name
-		data.email = defaultAddress.email
+		data.addressDetail = defaultAddress.AddressDetail
+		data.addressId = strconv.Itoa(defaultAddress.Id)
+		data.countyId = strconv.Itoa(defaultAddress.CountyId)
+		data.cityId = strconv.Itoa(defaultAddress.CityId)
+		data.provinceId = strconv.Itoa(defaultAddress.ProvinceId)
+		data.townId = strconv.Itoa(defaultAddress.TownId)
+		data.name = defaultAddress.Name
+		data.email = defaultAddress.Email
 
 		if invInfo != (invoiceInfo{}) {
 			data.invoice = "true"
-			data.invoiceTitle = invInfo.invoiceTitle
-			data.invoiceContent = invInfo.invoiceContentType
-			data.invoicePhoneKey = invInfo.invoicePhoneKey
-			data.invoicePhone = invInfo.invoicePhone
+			data.invoiceTitle = strconv.Itoa(invInfo.InvoiceTitle)
+			data.invoiceContent = strconv.Itoa(invInfo.InvoiceContentType)
+			data.invoicePhoneKey = invInfo.InvoicePhoneKey
+			data.invoicePhone = invInfo.InvoicePhone
 		}
+
+		//爱了。go语言对于null。完全不用判断。
+		if initData.SeckillSkuVO.ExtMap.YuShou == "" {
+			data.yuShou = "0"
+		} else {
+			data.yuShou = initData.SeckillSkuVO.ExtMap.YuShou
+		}
+
 	}
 
 	data.pru = ""
@@ -391,7 +402,6 @@ func BuildSubmitOrderPostData(pw string, fp string, eid string, skuid string, nu
 	data.invoiceCompanyName = ""
 	data.postCode = ""
 	data.isModifyAddress = "false"
-	data.yuShou = "" //todo
 
 	return toMapstringstring(data)
 }
@@ -401,7 +411,7 @@ func toMapstringstring(data SubmitOrderPostData) *map[string]string {
 	t := reflect.TypeOf(data)
 	v := reflect.ValueOf(data)
 	for i := 0; i < v.NumField(); i++ {
-		m[t.Field(i).Name] = v.Field(i).Interface().(string)
+		m[t.Field(i).Name] = v.Field(i).String()
 	}
 	return &m
 }
