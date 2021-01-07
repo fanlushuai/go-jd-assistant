@@ -29,7 +29,7 @@ func login() (err error) {
 	if util.Exists(c.Account.CookieFilePath) {
 		jdsdk.ReLoadCookies(c.Account.CookieFilePath)
 		if jdsdk.ValidCookie() {
-			fmt.Println("本地cookie登录成功")
+			fmt.Println("本地cookie 登录成功")
 			return nil
 		}
 	}
@@ -60,6 +60,7 @@ func login() (err error) {
 
 	if jdsdk.ValidQRTicket(ticket) {
 		jdsdk.SaveCookies(c.Account.CookieFilePath)
+		fmt.Println("QR 登录成功")
 		return nil
 	}
 
@@ -134,6 +135,20 @@ func getSubmitOrderPostData(sku config.Sku) *map[string]string {
 	return submitOrderPostData
 }
 
+//这种设计主要考虑，第一个请求，并没有成功。
+//为了尽快的获取，所以，悲观的认为第一个失败了，但是其实我们并不知道第一个的情况
+
+//间隔20毫秒，假设第一个请求失败了。那么可能第二个请求成功了，那么，我们相当于，一个正常的请求时间+20毫秒就能获取到。
+//如果，第二个，第三个，第n个都失败了,直到n+1成功了。
+//公式为：获取时间=n*20+正常的一个请求的耗时
+//可以看到，如果n=0.那么我们就是一个请求的耗时。
+//如果0=1，那么我们就是需要一个请求耗时+20ms.，
+
+//对比其他两种方式：
+//1.单纯for循环重试的耗时为，ReqT1+Tsleep+ReqT2
+//2.直接上来并发5个，来进行健壮性增强。认为，总会有一个ok的。这种方式，大多数的耗时为ReqT1.
+//  但是，这个只适合是单次健壮性增强的场景。此处还存在时间的问题。可能5个并发，全部命中了，killurl未刷新的情况。
+//  所以，可能还是要继续轮训。和第一个就一样了。
 func getKillUrl(skuId string) string {
 	ch := make(chan string, 1314)
 
