@@ -21,10 +21,12 @@ func Run() {
 	login()
 
 	diffTimeMs := diffLocalServerTime()
+	fmt.Println("服务器本地时差", diffTimeMs, "毫秒")
 
 	for index := range ac.Skus {
 		//注意，用索引的方式，可以获取到值，而不是值copy.可以配合动态监听配置文件，修改一些内容
 		sku := ac.Skus[index]
+		fmt.Println("开启doSku id=", sku.Id)
 		go doSku(sku, diffTimeMs)
 	}
 }
@@ -75,16 +77,22 @@ func login() (err error) {
 func doSku(sku config.Sku, diffTimeMs int) {
 	//基于时间校准，一个新的触发时间和抢购时间
 	triggerTimeMs := getTriggerTime(sku, diffTimeMs)
+	fmt.Println("校准后的触发时间", triggerTimeMs, "毫秒")
 
 	//不用sleep准点触发，对其精度表示怀疑。提前5s
 	waitToTriggerTimeMs := triggerTimeMs - int(time.Now().UnixNano()/1000000)
+	fmt.Println("触发时间提前5秒进入等待……")
 	time.Sleep(time.Duration(waitToTriggerTimeMs-5*1000) * time.Millisecond)
 
+	fmt.Println("获取秒杀需要的基本信息")
 	//先把初始化数据搞下，抢的时候，不浪费时间
 	submitOrderPostData := getSubmitOrderPostData(sku)
 	//消耗一下cpu，触发,这种方式也许会准点
+
+	fmt.Println("进入cpu紧张等待……")
 	nervousBlockWait(triggerTimeMs)
 
+	fmt.Println("进入秒杀！！！！！！！")
 	kill(sku, submitOrderPostData)
 }
 
@@ -119,10 +127,12 @@ func nervousBlockWait(timeMs int) {
 func kill(sku config.Sku, submitOrderPostData *map[string]string) {
 	//确保第一时间获取到killurl
 	killUrl := getKillUrl(sku.Id)
+	fmt.Println("获取到killurl", killUrl)
 
 	jdsdk.RequestKillUrl(sku.Id, killUrl)
 
 	//多次并发抢购
+	fmt.Println("提交")
 	submitOrder(sku.Id, sku.Count, submitOrderPostData)
 }
 
