@@ -6,6 +6,7 @@ import (
 	"go-jd-assistant/config"
 	"go-jd-assistant/jdsdk"
 	"go-jd-assistant/util"
+	"os"
 	"sync"
 	"time"
 )
@@ -69,6 +70,8 @@ func login() (err error) {
 		}
 
 		if checkLeftTimes--; checkLeftTimes == 0 {
+			fmt.Println("验证码扫描超时")
+			os.Exit(-1)
 			return errors.New("验证码扫描超时")
 		}
 	}
