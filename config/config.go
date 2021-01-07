@@ -37,7 +37,8 @@ func init() {
 
 	err := viper.ReadInConfig()
 	if err != nil {
-		fmt.Println("config read error")
+		fmt.Println("config read error，请理解一下go代码和配置分离的思想。在哪里运行，把config拷贝到相对执行文件的位置" +
+			"凡是用到这个config.yml文件的代码，在执行的位置，拷贝一份")
 	}
 
 	//todo 大坑：这个操作。结构体内的属性，必须大写开头。不然搞不进去！！！！
