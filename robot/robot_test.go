@@ -3,6 +3,7 @@ package robot
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 )
@@ -16,7 +17,7 @@ func TestDiffLocalServerTime(t *testing.T) {
 }
 
 func TestGetGetTriggerTime(t *testing.T) {
-	fmt.Println(getTriggerTime(ac.Sku, 20))
+	fmt.Println(getTriggerTime(ac.Skus[0], 20))
 }
 
 func TestNervousBlockWait(t *testing.T) {
@@ -73,4 +74,24 @@ func fakeKillUrl(skuId string) string {
 	killUrl := <-ch
 
 	return killUrl
+}
+
+func TestWg(t *testing.T) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	for index := range ac.Skus {
+		//注意，用索引的方式，可以获取到值，而不是值copy.可以配合动态监听配置文件，修改一些内容
+		sku := ac.Skus[index]
+		fmt.Println("开启doSku id=", sku.Id)
+		go func() {
+			time.Sleep(10 * time.Second)
+			fmt.Println("子线程结束")
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	fmt.Println("结束")
+
 }

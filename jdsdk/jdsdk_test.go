@@ -140,3 +140,8 @@ func TestBuildSubmitOrderPostData(t *testing.T) {
 	m := BuildSubmitOrderPostData("pw", "fp", "eid", "skuid", "num", &initdata)
 	fmt.Println(m)
 }
+
+func TestGetKillUrl(t *testing.T) {
+	ReLoadCookies("../my.cookies")
+	GetKillUrl("100012043978")
+}

@@ -6,6 +6,7 @@ import (
 	"go-jd-assistant/config"
 	"go-jd-assistant/jdsdk"
 	"go-jd-assistant/util"
+	"sync"
 	"time"
 )
 
@@ -23,12 +24,20 @@ func Run() {
 	diffTimeMs := diffLocalServerTime()
 	fmt.Println("服务器本地时差", diffTimeMs, "毫秒")
 
+	var wg sync.WaitGroup
+	wg.Add(len(ac.Skus))
+
 	for index := range ac.Skus {
 		//注意，用索引的方式，可以获取到值，而不是值copy.可以配合动态监听配置文件，修改一些内容
 		sku := ac.Skus[index]
 		fmt.Println("开启doSku id=", sku.Id)
-		go doSku(sku, diffTimeMs)
+		go func() {
+			doSku(sku, diffTimeMs)
+			wg.Done()
+		}()
 	}
+
+	wg.Wait()
 }
 
 func login() (err error) {

@@ -1,6 +1,7 @@
 package jdsdk
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/asmcos/requests"
@@ -18,6 +19,13 @@ var sessionReq = requests.Requests()
 var jarP *cookiejar.Jar
 
 func init() {
+	sessionReq.Client.Timeout = time.Duration(400) * time.Millisecond
+	sessionReq.Client.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+
 	sessionReq.Header.Set("User-Agent", userAgent)
 	//不允许重定向
 	sessionReq.Client.CheckRedirect =
@@ -197,8 +205,9 @@ func GetKillUrl(skuId string) string {
 	type Ret struct {
 		Url string
 	}
+
 	var r Ret
-	resp.Json(&r)
+	json.Unmarshal([]byte(getJsonStr(resp.Text())), &r)
 
 	if len(r.Url) > 3 {
 		url = strings.Replace(url, "divide", "marathon", -1)
