@@ -25,7 +25,7 @@ func Run() {
 	for index := range ac.Skus {
 		//注意，用索引的方式，可以获取到值，而不是值copy.可以配合动态监听配置文件，修改一些内容
 		sku := ac.Skus[index]
-		doSku(sku, diffTimeMs)
+		go doSku(sku, diffTimeMs)
 	}
 }
 
