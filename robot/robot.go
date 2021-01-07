@@ -22,7 +22,11 @@ func Run() {
 
 	diffTimeMs := diffLocalServerTime()
 
-	doSku(ac.Sku, diffTimeMs)
+	for index := range ac.Skus {
+		//注意，用索引的方式，可以获取到值，而不是值copy.可以配合动态监听配置文件，修改一些内容
+		sku := ac.Skus[index]
+		doSku(sku, diffTimeMs)
+	}
 }
 
 func login() (err error) {
@@ -81,7 +85,7 @@ func doSku(sku config.Sku, diffTimeMs int) {
 	//消耗一下cpu，触发,这种方式也许会准点
 	nervousBlockWait(triggerTimeMs)
 
-	kill(submitOrderPostData)
+	kill(sku, submitOrderPostData)
 }
 
 func getTriggerTime(sku config.Sku, diffTimeMs int) int {
@@ -112,14 +116,14 @@ func nervousBlockWait(timeMs int) {
 	fmt.Println("开始执行")
 }
 
-func kill(submitOrderPostData *map[string]string) {
+func kill(sku config.Sku, submitOrderPostData *map[string]string) {
 	//确保第一时间获取到killurl
-	killUrl := getKillUrl(ac.Sku.Id)
+	killUrl := getKillUrl(sku.Id)
 
-	jdsdk.RequestKillUrl(ac.Sku.Id, killUrl)
+	jdsdk.RequestKillUrl(sku.Id, killUrl)
 
 	//多次并发抢购
-	submitOrder(ac.Sku.Id, ac.Sku.Count, submitOrderPostData)
+	submitOrder(sku.Id, sku.Count, submitOrderPostData)
 }
 
 func getSubmitOrderPostData(sku config.Sku) *map[string]string {
@@ -128,8 +132,8 @@ func getSubmitOrderPostData(sku config.Sku) *map[string]string {
 		ac.Pwd,
 		ac.Fp,
 		ac.Eid,
-		ac.Sku.Id,
-		ac.Sku.Count,
+		sku.Id,
+		sku.Count,
 		&initInfo,
 	)
 	return submitOrderPostData

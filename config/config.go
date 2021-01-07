@@ -16,7 +16,7 @@ type Account struct {
 	Fp             string
 	TrackId        string
 	RiskControl    string
-	Sku            Sku
+	Skus           []Sku
 }
 
 type Sku struct {

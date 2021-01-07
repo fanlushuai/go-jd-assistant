@@ -1,9 +1,15 @@
 package config
 
 import (
+	"fmt"
 	"testing"
 )
 
-func TestInitConfig(t *testing.T) {
-	//fmt.Println(InitConfig("."))
+func TestConfig(t *testing.T) {
+	fmt.Println(Config)
+
+	for index := range Config.Account.Skus {
+		sku := Config.Account.Skus[index]
+		fmt.Println(sku)
+	}
 }
