@@ -108,7 +108,7 @@ func TestValidCookie(t *testing.T) {
 
 func TestGetKillInitInfo(t *testing.T) {
 	ReLoadCookies("../my.cookies")
-	GetKillInitInfo("100012043978", "1")
+	fmt.Println(GetKillInitInfo("100012043978", "1"))
 }
 
 func TestSubmitOrder(t *testing.T) {

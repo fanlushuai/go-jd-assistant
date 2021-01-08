@@ -19,7 +19,7 @@ var sessionReq = requests.Requests()
 var jarP *cookiejar.Jar
 
 func init() {
-	sessionReq.Client.Timeout = time.Duration(400) * time.Millisecond
+	sessionReq.Client.Timeout = time.Duration(10) * time.Second
 	sessionReq.Client.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
@@ -329,7 +329,6 @@ type InitData struct {
 	AddressList  []address
 	InvoiceInfo  invoiceInfo
 	SeckillSkuVO seckillSkuVO
-	Test         seckillSkuVO
 	Token        string
 }
 
