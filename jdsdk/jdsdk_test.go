@@ -108,7 +108,10 @@ func TestValidCookie(t *testing.T) {
 
 func TestGetKillInitInfo(t *testing.T) {
 	ReLoadCookies("../my.cookies")
-	fmt.Println(GetKillInitInfo("100012043978", "1"))
+	initInfo, err := GetKillInitInfo("100012043978", "1")
+	if err == nil {
+		fmt.Println(initInfo)
+	}
 }
 
 func TestSubmitOrder(t *testing.T) {
@@ -136,9 +139,11 @@ func TestPareJson(t *testing.T) {
 
 func TestBuildSubmitOrderPostData(t *testing.T) {
 	ReLoadCookies("../my.cookies")
-	initdata := GetKillInitInfo("100012043978", "1")
-	m := BuildSubmitOrderPostData("pw", "fp", "eid", "skuid", "num", &initdata)
-	fmt.Println(m)
+	initInfo, err := GetKillInitInfo("100012043978", "1")
+	if err == nil {
+		m := BuildSubmitOrderPostData("pw", "fp", "eid", "skuid", "num", &initInfo)
+		fmt.Println(m)
+	}
 }
 
 func TestGetKillUrl(t *testing.T) {

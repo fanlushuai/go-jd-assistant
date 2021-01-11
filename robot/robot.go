@@ -17,11 +17,11 @@ var ac config.Account
 func init() {
 	c = config.Config
 	ac = config.Config.Account
+	//jdsdk.Proxy("http://localhost:8888")
 }
 
 func Run() {
 	login()
-
 	diffTimeMs := diffLocalServerTime()
 	fmt.Println("服务器本地时差", diffTimeMs, "毫秒")
 
@@ -87,9 +87,6 @@ func login() (err error) {
 
 //this can do for many sku if you need,code like: for sku skus {doSku(sku)}
 func doSku(sku config.Sku, diffTimeMs int) {
-	//先把初始化数据搞下，抢的时候，不浪费时间
-	submitOrderPostData := getSubmitOrderPostData(sku)
-	fmt.Println("获取秒杀需要的基本信息", submitOrderPostData)
 
 	//基于时间校准，一个新的触发时间和抢购时间
 	triggerTimeMs := getTriggerTime(sku, diffTimeMs)
@@ -97,8 +94,17 @@ func doSku(sku config.Sku, diffTimeMs int) {
 
 	//不用sleep准点触发，对其精度表示怀疑。提前5s
 	waitToTriggerTimeMs := triggerTimeMs - int(time.Now().UnixNano()/1000000)
-	fmt.Println("触发时间提前5秒进入等待……")
-	time.Sleep(time.Duration(waitToTriggerTimeMs-5*1000) * time.Millisecond)
+	fmt.Println("触发时间提前25秒获取一下基本信息。基本信息接口有频率限制，防止一次获取不成功")
+	time.Sleep(time.Duration(waitToTriggerTimeMs-25*1000) * time.Millisecond)
+
+	//先把初始化数据搞下，抢的时候，不浪费时间.这接口很危险。不知道会处理多久
+	submitOrderPostData := getSubmitOrderPostData(sku)
+	fmt.Println("获取秒杀需要的基本信息", submitOrderPostData)
+
+	if triggerTimeMs-int(time.Now().UnixNano()/1000000) > 5000 {
+		fmt.Println("触发时间提前5秒进入等待……")
+		time.Sleep(time.Duration(waitToTriggerTimeMs-5*1000) * time.Millisecond)
+	}
 
 	//消耗一下cpu，触发,这种方式也许会准点
 	fmt.Println("进入cpu紧张等待……")
@@ -148,17 +154,27 @@ func kill(sku config.Sku, submitOrderPostData *map[string]string) {
 	submitOrder(sku.Id, sku.Count, submitOrderPostData)
 }
 
+// 这个接口容易被频率限制，大概是5s。持续5s，返回null数据
 func getSubmitOrderPostData(sku config.Sku) *map[string]string {
-	initInfo := jdsdk.GetKillInitInfo(sku.Id, sku.Count)
-	submitOrderPostData := jdsdk.BuildSubmitOrderPostData(
-		ac.Pwd,
-		ac.Fp,
-		ac.Eid,
-		sku.Id,
-		sku.Count,
-		&initInfo,
-	)
-	return submitOrderPostData
+	for {
+		initInfo, err := jdsdk.GetKillInitInfo(sku.Id, sku.Count)
+
+		if err != nil {
+			continue
+		}
+
+		time.Sleep(1 * time.Second)
+
+		submitOrderPostData := jdsdk.BuildSubmitOrderPostData(
+			ac.Pwd,
+			ac.Fp,
+			ac.Eid,
+			sku.Id,
+			sku.Count,
+			&initInfo,
+		)
+		return submitOrderPostData
+	}
 }
 
 //这种设计主要考虑，第一个请求，并没有成功。

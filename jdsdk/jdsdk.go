@@ -3,6 +3,7 @@ package jdsdk
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/asmcos/requests"
 	"github.com/vdobler/ht/cookiejar"
@@ -159,7 +160,7 @@ func GetUserInfo() string {
 	return r.NickName
 }
 
-func GetKillInitInfo(skuId string, num string) InitData {
+func GetKillInitInfo(skuId string, num string) (initData InitData, err error) {
 	url := "https://marathon.jd.com/seckillnew/orderService/pc/init.action"
 	header := requests.Header{
 		"Host": "marathon.jd.com",
@@ -176,12 +177,16 @@ func GetKillInitInfo(skuId string, num string) InitData {
 	resp, err := sessionReq.Post(url, header, data)
 	if err != nil {
 		fmt.Println("fuck initinfo 获取失败了。好好思考一下")
-		return InitData{}
+		return InitData{}, errors.New("请求错误")
 	}
 
 	var initdata InitData
 	resp.Json(&initdata)
-	return initdata
+	if len(initData.AddressList) == 0 {
+		return InitData{}, errors.New("响应错误，估计被频率限制了")
+	}
+
+	return initdata, nil
 }
 
 func GetKillUrl(skuId string) string {
