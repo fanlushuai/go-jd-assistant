@@ -210,8 +210,8 @@ func GetKillUrl(skuId string) string {
 	json.Unmarshal([]byte(getJsonStr(resp.Text())), &r)
 
 	if len(r.Url) > 3 {
-		url = strings.Replace(url, "divide", "marathon", -1)
-		killUrl := strings.Replace(url, "user_routing", "captcha.html", -1)
+		r.Url = strings.Replace(r.Url, "divide", "marathon", -1)
+		killUrl := strings.Replace(r.Url, "user_routing", "captcha.html", -1)
 		return "https:" + killUrl
 	}
 
