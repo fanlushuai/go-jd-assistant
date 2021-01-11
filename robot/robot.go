@@ -232,7 +232,10 @@ func submitOrder(skuId string, num string, data *map[string]string) {
 
 	for tryTimes > 0 {
 		tryTimes--
-		go jdsdk.SubmitOrder(skuId, num, data)
+		//不要进行开两个线程了。底层的requests库，单个request不能进行并发操作。
+		//因为在处理request的元素局的时候，存在很多数据结构的copy读写。容易出现并发读写问题
+		//但是还是开启多线程。主要原因。是并发读写应该在延时20毫秒的情况被削弱很多
+		//暂时这样用。下次再观察。如果要保证一定不会发生。之后，多生成几个request实例。
 		go jdsdk.SubmitOrder(skuId, num, data)
 		time.Sleep(20 * time.Millisecond)
 	}
